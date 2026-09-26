@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سجل نقاط التدقيق - شؤون السائقين</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1720; --panel:#17212b; --panel2:#1e2a37; --text:#e8eef4; --muted:#8fa3b3;
+    --accent:#2fb5a3; --accent2:#3d8bfd; --border:#2a3948; --chip:#233240;
+    --ok:#2fb56a; --warn:#e0a83c; --bad:#e05f5f;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:"Segoe UI","Tahoma",Arial,sans-serif; background:linear-gradient(180deg,#0c131a,#111c26 400px); color:var(--text);
+    min-height:100vh;
+  }
+  header{
+    padding:26px 24px 14px; text-align:center; border-bottom:1px solid var(--border);
+    background:radial-gradient(1200px 300px at 50% -80px, rgba(47,181,163,.18), transparent);
+  }
+  header h1{margin:0 0 6px; font-size:24px;}
+  header p{margin:0; color:var(--muted); font-size:13px;}
+  .nav{display:flex; justify-content:center; gap:10px; margin-top:14px;}
+  .nav a{color:var(--accent2); text-decoration:none; font-size:13px; border:1px solid var(--border); padding:6px 14px; border-radius:999px;}
+  .nav a:hover{border-color:var(--accent2);}
+  .wrap{max-width:1150px; margin:0 auto; padding:20px 16px 60px;}
+  .tabs{display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--border);}
+  .tab{padding:10px 20px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; font-size:14px; user-select:none;}
+  .tab.active{color:var(--text); border-bottom-color:var(--accent); font-weight:600;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  /* Reference tab */
+  .ref-card{
+    display:flex; align-items:center; gap:14px; padding:16px 18px; background:var(--panel);
+    border:1px solid var(--border); border-radius:12px; text-decoration:none; color:var(--text); margin-bottom:10px;
+  }
+  .ref-card:hover{border-color:var(--accent2); background:var(--panel2);}
+  .ref-icon{flex:0 0 46px; width:46px; height:46px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:#3a1f1f; color:#ff7a6e; font-size:11px; font-weight:700;}
+  .ref-title{font-size:15px; margin-bottom:3px;}
+  .ref-sub{font-size:12px; color:var(--muted);}
+  .note{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; font-size:13px; color:var(--muted); margin-bottom:18px; line-height:1.8;}
+
+  /* Register tab */
+  .input-box{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:20px;}
+  .input-box h3{margin:0 0 10px; font-size:15px;}
+  textarea{
+    width:100%; min-height:90px; background:var(--panel2); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); padding:10px; font-family:inherit; font-size:13px; resize:vertical;
+  }
+  .row{display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; align-items:center;}
+  button{
+    background:var(--accent); color:#06201c; border:none; padding:9px 18px; border-radius:8px; font-size:13px;
+    font-weight:600; cursor:pointer;
+  }
+  button.secondary{background:var(--chip); color:var(--text); border:1px solid var(--border);}
+  button:hover{opacity:.9;}
+  input[type=file]{color:var(--muted); font-size:12px;}
+  .hint{font-size:12px; color:var(--muted);}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th, td{padding:10px; border-bottom:1px solid var(--border); text-align:right; vertical-align:top;}
+  th{color:var(--muted); font-weight:600; font-size:12px;}
+  td input, td select, td textarea{
+    width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:6px 8px; font-size:12.5px; font-family:inherit;
+  }
+  td textarea{min-height:44px; resize:vertical;}
+  .status-badge{padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; display:inline-block;}
+  .status-pending{background:rgba(224,168,60,.18); color:var(--warn);}
+  .status-accepted{background:rgba(47,181,106,.18); color:var(--ok);}
+  .status-objected{background:rgba(224,95,95,.18); color:var(--bad);}
+  .del-btn{background:transparent; color:var(--bad); border:1px solid var(--border); padding:6px 10px; font-size:12px;}
+  .attach-wrap{margin-top:8px; display:flex; flex-direction:column; gap:6px; align-items:flex-end;}
+  .attach-btn{background:transparent; color:var(--accent2); border:1px solid var(--border); padding:6px 10px; font-size:13px; border-radius:6px; cursor:pointer;}
+  .attach-btn:hover{border-color:var(--accent2);}
+  .attach-chip{display:flex; align-items:center; gap:6px; background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:4px 10px; font-size:11px; max-width:170px;}
+  .attach-chip a{color:var(--accent); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .attach-chip a:hover{text-decoration:underline;}
+  .attach-del{color:var(--bad); cursor:pointer; font-weight:700; padding:0 2px;}
+  .empty{text-align:center; padding:50px 20px; color:var(--muted);}
+  .stats{font-size:12px; color:var(--muted); margin-bottom:14px; display:flex; gap:16px; flex-wrap:wrap;}
+  .stats b{color:var(--text);}
+  .flag-box{background:rgba(224,168,60,.08); border:1px solid rgba(224,168,60,.4); border-radius:10px; padding:14px 16px; margin-bottom:18px;}
+  .flag-box h3{margin:0 0 8px; font-size:14px; color:var(--warn);}
+  .flag-item{border-bottom:1px dashed rgba(224,168,60,.3); padding:8px 0; font-size:12.5px; line-height:1.8;}
+  .flag-item:last-child{border-bottom:none;}
+  .flag-item b{color:var(--text);}
+  td textarea.flag-input{border-color:rgba(224,168,60,.5);}
+</style>
+</head>
+<body>
+<div id="lockScreen" style="position:fixed;inset:0;background:#0b1620;color:#eaf2f8;display:flex;align-items:center;justify-content:center;z-index:99999;font-family:Tahoma,Arial,sans-serif;direction:rtl;">
+  <div style="background:#132433;border:1px solid #2a3948;border-radius:12px;padding:36px 30px;width:320px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);">
+    <div style="font-size:34px;margin-bottom:10px;">🔒</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:18px;">سجل نقاط التدقيق - محمي</div>
+    <input id="lockPass" type="password" placeholder="كلمة المرور" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #2a3948;background:#0b1620;color:#eaf2f8;font-size:14px;margin-bottom:12px;text-align:right;">
+    <button id="lockBtn" style="width:100%;padding:10px;border:none;border-radius:8px;background:#2fb5a3;color:#06201c;font-weight:700;cursor:pointer;font-size:14px;">دخول</button>
+    <div id="lockErr" style="color:#e05f5f;font-size:12px;margin-top:10px;display:none;">كلمة المرور غير صحيحة</div>
+  </div>
+</div>
+<script>
+(function(){
+  var CORRECT_HASH = "95a89925a592c25378757e8b21cbbb56cb6f9173dcc584adbaa14d3d63dbbc0c";
+  var STORE_KEY = "auditRegisterUnlocked_v1";
+
+  async function sha256Hex(text){
+    var enc = new TextEncoder().encode(text);
+    var buf = await crypto.subtle.digest("SHA-256", enc);
+    return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,"0"); }).join("");
+  }
+
+  function unlock(){
+    document.getElementById("lockScreen").style.display = "none";
+    document.getElementById("appRoot").style.display = "";
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    document.getElementById("appRoot").style.display = "none";
+    if (localStorage.getItem(STORE_KEY) === "1") { unlock(); return; }
+
+    var btn = document.getElementById("lockBtn");
+    var input = document.getElementById("lockPass");
+    var err = document.getElementById("lockErr");
+
+    async function tryUnlock(){
+      var h = await sha256Hex(input.value);
+      if (h === CORRECT_HASH) {
+        localStorage.setItem(STORE_KEY, "1");
+        unlock();
+      } else {
+        err.style.display = "block";
+        input.value = "";
+        input.focus();
+      }
+    }
+    btn.addEventListener("click", tryUnlock);
+    input.addEventListener("keydown", function(e){ if (e.key === "Enter") tryUnlock(); });
+    input.focus();
+  });
+})();
+</script>
+<div id="appRoot">
+
+
+<header>
+  <h1>📋 سجل نقاط التدقيق — شؤون السائقين</h1>
+  <p>مقارنة نقاط التدقيق باللوائح المعتمدة واللجان، وتتبع القرار والحل لكل نقطة</p>
+  <div class="nav"><a href="index.html">🔍 فهرس كل الملفات</a></div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" data-tab="ref">المرجع المعتمد</div>
+    <div class="tab" data-tab="register">سجل نقاط التدقيق</div>
+  </div>
+
+  <!-- Reference Panel -->
+  <div class="panel active" id="panel-ref">
+    <div class="note">
+      المراجع المعتمدة المستخدمة في التحليل: <b>الإصدار الأول من لائحة شؤون السائقين</b> (الأدوار والمسؤوليات + البند 23.8 لمتابعة مديونيات السائقين) · <b>لائحة المخالفات</b> (البند 5 جدول المخالفات وعمود "جهة التطبيق"، البند 7 "الجهات المختصة بالتنفيذ"، البند 8 اتفاقية مستوى الخدمة مع التحقيق — تم استخراج الجدول فعليًا بالأعمدة وليس فقط قراءته كنص) · <b>تعميم داخلي 32/2025 - لجنة تظلمات السائقين</b> (نص الاختصاصات مقروء مباشرة من التعميم الأصلي) · <b>تعميم داخلي 28/2025 - لجنة شؤون السائقين</b> (نص الاختصاصات مقروء مباشرة من التعميم الأصلي، وتحديدًا البند 8 الخاص بتقسيط المديونيات) · <b>دليل التظلمات والشكاوى</b> (قرار إداري 19/2024) · <b>إجراءات قسم شؤون السائقين</b> (معتمد 24/11/2025) · <b>إجراءات التدريب ورعاية السائقين</b> (معتمد 15/12/2025) · <b>DTC N-3 Roles & Responsibilities</b> (مستند الهيكل التنظيمي المعتمد من الرئيس التنفيذي يوليو 2025). كل تحليل لأي نقطة تدقيق بيتبني على النصوص دي مباشرة (وأحيانًا على استخراج الجداول بالأعمدة الفعلية لتفادي القراءة الخاطئة)، مش على وصف تقرير التدقيق (GIA) لمين مسؤول عن إيه. منهجية ثابتة: أي بند يُعتبر "مغطى/منجز" لازم يكون مُسنَد لمستند معتمد موجود فعليًا في هذا المرجع - غير كده يُصاغ الآن كمسودة جديدة بدل وصفه كمطلوب مستقبلاً فقط.
+    </div>
+
+    <div class="input-box" id="uploadBox">
+      <h3>⬆️ رفع ملفات جديدة للمرجع المعتمد</h3>
+      <div class="hint" style="margin-bottom:10px; line-height:1.8;">
+        خطوة 1 مرة واحدة بس: بتدّي المتصفح إذن "كتابة" جوه مجلد Audit data collection على جهازك — مفيش أي حاجة بترفع للإنترنت أو بتوصلني أنا، كله شغال محليًا على جهازك. بعدها تقدر ترفع أي عدد ملفات من أي مكان في جهازك من غير ما يطلب الإذن تاني.
+      </div>
+      <div id="connectRow" class="row">
+        <button onclick="connectFolder()">🔓 فعّل الرفع (اختَر مجلد Audit data collection مرة واحدة)</button>
+        <span class="hint" id="connectStatus">غير متصل</span>
+      </div>
+      <div class="row" id="uploadRow" style="display:none;">
+        <select id="refCategory">
+          <option value="لائحة">لائحة</option>
+          <option value="لجنة">لجنة</option>
+          <option value="أخرى">أخرى (سياسة/دليل)</option>
+        </select>
+        <input type="text" id="refLabel" placeholder="اسم مختصر (اختياري، لو رفعت أكتر من ملف هيتجاهل)" style="flex:1; min-width:180px; background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px;">
+        <input type="file" id="refFileInput" multiple>
+        <button onclick="uploadRefFile()">رفع وحفظ في المجلد</button>
+      </div>
+      <div class="hint" id="apiWarning" style="display:none; margin-top:8px; color:var(--warn);">
+        متصفحك الحالي ما بيدعمش الرفع المباشر (الميزة دي شغالة على Chrome أو Edge بس). ابعتلي اسم الملف وأنا أضيفه بدل منك.
+      </div>
+      <div class="hint" style="margin-top:8px;">الملفات بترفع فعليًا جوه مجلد فرعي اسمه "مرجع مضاف" داخل مجلد التدقيق — مفيش أي ملف تاني بيتلمس أو يتعدل. تقدر تختار كذا ملف مرة واحدة.</div>
+    </div>
+
+    <div id="ref-list"></div>
+  </div>
+
+  <!-- Register Panel -->
+  <div class="panel" id="panel-register">
+    <div class="input-box">
+      <h3>➕ إضافة نقاط تدقيق جديدة</h3>
+      <textarea id="pasteBox" placeholder="الصق نقطة تدقيق أو أكثر هنا — كل سطر يتحول تلقائيًا لنقطة منفصلة"></textarea>
+      <div class="row">
+        <button onclick="addFromTextarea()">إضافة النقاط المكتوبة</button>
+        <span class="hint">أو ارفع ملف:</span>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.txt,.docx">
+        <button class="secondary" onclick="handleFile()">استيراد من الملف</button>
+      </div>
+      <div class="hint" style="margin-top:8px;">Excel/CSV: أول عمود في كل صف يُعتبر نص النقطة. Word/TXT: كل سطر = نقطة.</div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+    <div id="flagBox"></div>
+    <div class="row" style="margin-bottom:14px;">
+      <button class="secondary" onclick="copyPending()">📋 نسخ النقاط "قيد المراجعة" للصقها في الشات مع Claude</button>
+      <button class="secondary" onclick="exportAllXLSX()">⬇️ تصدير الكل في ملف Excel واحد</button>
+      <button class="secondary" onclick="exportEachAsFile()">📁 تصدير كل نقطة كملف Excel منفصل</button>
+      <button class="secondary" onclick="exportFlaggedXLSX()">⚠️ تصدير النقاط اللي تحتاج مراجعة فقط (لاجتماع فريق التدقيق)</button>
+    </div>
+
+    <div id="tableWrap"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- Reference data ---------- */
+const REF_FILES = [
+  {name:"الإصدار الأول من لائحة شؤون سائقي شركة تاكسي دبي.pdf", label:"اللائحة العامة المعتمدة (الإصدار الأول)", path:["Point 1","الإصدار الأول من لائحة شؤون سائقي شركة تاكسي دبي.pdf"]},
+  {name:"لائحة مخالفات سائقي ومشرفات شركة تاكسي دبي.pdf", label:"لائحة المخالفات", path:["Point 1","لائحة مخالفات سائقي ومشرفات شركة تاكسي دبي.pdf"]},
+  {name:"لجنة تظلمات سائقي ومشرفات شركة تاكسي دبي.pdf", label:"تعميم 32/2025 - لجنة التظلمات", path:["Point 1","لجنة تظلمات سائقي ومشرفات شركة تاكسي دبي.pdf"]},
+  {name:"لجنة شؤون سائقي ومشرفات شركة تاكسي دبي.pdf", label:"تعميم 28/2025 - لجنة شؤون السائقين", path:["Point 1","لجنة شؤون سائقي ومشرفات شركة تاكسي دبي.pdf"]},
+  {name:"دليل التظلمات والشكاوي لسائقي ومشرفات الشركة.pdf", label:"دليل التظلمات والشكاوى (قرار 19/2024)", path:["Point 1","دليل التظلمات والشكاوي لسائقي ومشرفات الشركة.pdf"]},
+  {name:"اجراءات قسم شؤون السائقين.pdf", label:"إجراءات قسم شؤون السائقين (24/11/2025)", path:["اجراءات قسم شؤون السائقين.pdf"]},
+  {name:"Driver Training and welfare procedures.pdf", label:"إجراءات التدريب ورعاية السائقين (15/12/2025)", path:["Driver Training and welfare procedures.pdf"]},
+  {name:"صرف الجوائز.pdf", label:"إجراء صرف الجوائز لسائقي مركبات الأجرة (نوفمبر 2024)", path:["point 5","صرف الجوائز.pdf"]},
+];
+
+function hrefOf(segments){ return segments.map(s => encodeURIComponent(s)).join("/"); }
+
+/* ---------- Extra approved refs (uploaded via the site) ---------- */
+const EXTRA_REFS_KEY = "dtc_extra_refs";
+const UPLOAD_SUBFOLDER = "مرجع مضاف";
+let dirHandle = null;
+
+function loadExtraRefs(){
+  try{ return JSON.parse(localStorage.getItem(EXTRA_REFS_KEY)) || []; }catch(e){ return []; }
+}
+function saveExtraRefs(list){ localStorage.setItem(EXTRA_REFS_KEY, JSON.stringify(list)); }
+
+function extOf(name){ const m = name.match(/\.([a-zA-Z0-9]+)$/); return m ? m[1].toLowerCase() : "أخرى"; }
+
+function renderRef(){
+  const el = document.getElementById("ref-list");
+  const extras = loadExtraRefs();
+  const hardcoded = REF_FILES.map(f => `
+    <a class="ref-card" href="${hrefOf(f.path)}" target="_blank" rel="noopener">
+      <div class="ref-icon">PDF</div>
+      <div>
+        <div class="ref-title">${f.label}</div>
+        <div class="ref-sub">${f.name}</div>
+      </div>
+    </a>
+  `).join("");
+  const extraCards = extras.map((f, i) => `
+    <div class="ref-card" style="cursor:default;">
+      <a href="${hrefOf(f.path)}" target="_blank" rel="noopener" style="display:flex; align-items:center; gap:14px; flex:1; text-decoration:none; color:inherit;">
+        <div class="ref-icon">${extOf(f.name).toUpperCase()}</div>
+        <div>
+          <div class="ref-title">${f.label || f.name}</div>
+          <div class="ref-sub">${f.category} · ${f.name} · أُضيف ${f.addedAt}</div>
+        </div>
+      </a>
+      <button class="del-btn" onclick="hideExtraRef(${i})">إخفاء من القائمة</button>
+    </div>
+  `).join("");
+  el.innerHTML = hardcoded + extraCards;
+}
+
+function hideExtraRef(index){
+  if(!confirm("إخفاء هذا الملف من قائمة المرجع المعتمد؟ (الملف نفسه هيفضل موجود في المجلد، بس هيتشال من القائمة هنا)")) return;
+  const extras = loadExtraRefs();
+  extras.splice(index, 1);
+  saveExtraRefs(extras);
+  renderRef();
+}
+
+/* ---------- Direct upload via File System Access API ---------- */
+if(!('showDirectoryPicker' in window)){
+  document.getElementById("apiWarning").style.display = "block";
+  document.getElementById("connectRow").style.display = "none";
+}
+
+/* Tiny IndexedDB helper to remember the folder handle so the user
+   doesn't have to reconnect every visit */
+const IDB_NAME = "dtc_audit_tool", IDB_STORE = "handles", IDB_KEY = "auditFolder";
+function idbOpen(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(value){
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(value, IDB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbGet(){
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function markConnected(){
+  document.getElementById("connectStatus").textContent = "✅ متصل بمجلد Audit data collection";
+  document.getElementById("uploadRow").style.display = "flex";
+}
+
+async function connectFolder(){
+  try{
+    const handle = await window.showDirectoryPicker();
+    // sanity check: this file itself should exist in the chosen folder
+    try{
+      await handle.getFileHandle("سجل_نقاط_التدقيق.html");
+    }catch(e){
+      alert('ده مش نفس المجلد. اختار مجلد "Audit data collection" (نفس المجلد اللي فيه هذه الصفحة).');
+      return;
+    }
+    const perm = await handle.requestPermission({mode:"readwrite"});
+    if(perm !== "granted"){
+      alert("لازم توافق على صلاحية الكتابة عشان الرفع يشتغل.");
+      return;
+    }
+    dirHandle = handle;
+    await idbSet(handle); // remember for next time
+    markConnected();
+  }catch(e){
+    // user cancelled the picker — no action needed
+  }
+}
+
+async function reconfirmAccess(){
+  const handle = await idbGet();
+  if(!handle) return;
+  const perm = await handle.requestPermission({mode:"readwrite"});
+  if(perm === "granted"){
+    dirHandle = handle;
+    markConnected();
+  }
+}
+
+async function tryRestoreConnection(){
+  if(!('showDirectoryPicker' in window)) return;
+  try{
+    const handle = await idbGet();
+    if(!handle) return;
+    const perm = await handle.queryPermission({mode:"readwrite"});
+    if(perm === "granted"){
+      dirHandle = handle;
+      markConnected();
+    } else {
+      document.getElementById("connectStatus").textContent = "اتصلت قبل كده — دوس تأكيد عشان تكمل";
+      const row = document.getElementById("connectRow");
+      const btn = document.createElement("button");
+      btn.className = "secondary";
+      btn.textContent = "تأكيد الوصول تاني";
+      btn.onclick = reconfirmAccess;
+      row.appendChild(btn);
+    }
+  }catch(e){ /* stored handle no longer valid — ignore, user can reconnect */ }
+}
+
+async function uploadRefFile(){
+  if(!dirHandle){ alert('فعّل الرفع الأول.'); return; }
+  const fileInput = document.getElementById("refFileInput");
+  const files = Array.from(fileInput.files || []);
+  if(files.length === 0){ alert("اختر ملف واحد أو أكتر."); return; }
+  const category = document.getElementById("refCategory").value;
+  const label = files.length === 1 ? document.getElementById("refLabel").value.trim() : "";
+
+  try{
+    const subDir = await dirHandle.getDirectoryHandle(UPLOAD_SUBFOLDER, {create:true});
+    const extras = loadExtraRefs();
+    for(const file of files){
+      const fileHandle = await subDir.getFileHandle(file.name, {create:true});
+      const writable = await fileHandle.createWritable();
+      await writable.write(await file.arrayBuffer());
+      await writable.close();
+      extras.push({
+        name: file.name,
+        label: label,
+        category: category,
+        path: [UPLOAD_SUBFOLDER, file.name],
+        addedAt: new Date().toLocaleDateString("ar-EG")
+      });
+    }
+    saveExtraRefs(extras);
+    renderRef();
+    fileInput.value = "";
+    document.getElementById("refLabel").value = "";
+    alert("تم رفع " + files.length + " ملف وإضافتهم للمرجع المعتمد ✅");
+  }catch(e){
+    alert("حصل خطأ أثناء الرفع: " + e.message);
+  }
+}
+
+tryRestoreConnection();
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+  });
+});
+
+/* ---------- Register storage ---------- */
+const STORAGE_KEY = "dtc_audit_points_register";
+
+function loadPoints(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }catch(e){ return []; }
+}
+function savePoints(points){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(points));
+}
+/* Points Claude has already analyzed and pre-filled for you — added once,
+   by fixed id, so re-opening the page never duplicates them. You can edit
+   or delete them like any other row. */
+const SEED_POINTS = [
+  {
+    id: "seed-obs7-rec1-3148",
+    auditNo: "3148",
+    text: "ملاحظة 7 - التوصية 1 (خطة العمل 3148): تفعيل إشعارات وتقارير مخصصة في JDE عند تسجيل مخالفات/استقطاعات على موظفين بحالة \"منتهي الخدمة (Terminated)\"، لدعم المراقبة الاستباقية والتدخل في الوقت المناسب.\n\nالتنفيذ الحالي (CH-1109) بيعمل حجب كامل لأي حركة على الموظف المنتهي خدمته من أول يوم. لكن GIA رفضوا الإغلاق لأن التصميم المطلوب مختلف: حالة \"Terminated\" لازم تكون مجرد مشغّل مراقبة، مع السماح بتسجيل مخالفات صحيحة خلال أول 30 يوم (فترة التصفية النهائية)، وبعد اليوم 31 يفضل مسموح بالتسجيل لكن يدخل تلقائيًا في مجموعة استثناءات للمراقبة والتصعيد حسب سياسة أعمار الديون بالمالية.",
+    addedAt: new Date().toLocaleDateString("ar-EG"),
+    status: "قيد المراجعة",
+    department: "قسم التشغيل (تفعيل حالة Terminated نفسها في TEAMS/JDE) + Business Application Section (إعادة ضبط منطق JDE) + قسم المالية (اعتماد آلية الشطب والتسوية النهائية) + شؤون السائقين (خطوات إخلاء الطرف اللاحقة فقط)",
+    flagNote: "التصميم المطلوب هنا بيلمس 4 جهات مختلفة (التشغيل، تقنية/IT، مالية، شؤون سائقين) وGIA ممكن يبسّطوا الصورة وينسبوا التنفيذ كله لشؤون السائقين لأن الموظف/السائق هو محور الملاحظة. بالرجوع للمراجع، وبعد استخراج جدول عمود \"مسؤولية التنفيذ\" في إجراءات قسم شؤون السائقين تحديدًا (مش قراءته كنص عام):\n\n1) تصحيح جوهري: تفعيل حالة \"Terminated\" نفسها في TEAMS وJD Edwards ليست من اختصاص شؤون السائقين. في مسار الإقالة (قسم 8.11، الخطوة 2) هي مسؤولية قسم التشغيل وحده. في إجراء إخلاء الطرف العام (قسم 8.12، الخطوة 1) هي مسؤولية مشتركة بين قسم التشغيل وشؤون السائقين، مش شؤون السائقين منفردة.\n\n2) دور شؤون السائقين الفعلي والمنفرد (حسب باقي خطوات قسم 8.12): استلام بطاقة العمل وتحصيل المديونيات عند الخروج (خطوة 3)، احتساب وإدخال رصيد الإجازات (خطوة 7)، إجراءات التأشيرة (خطوة 8)، احتساب المكافأة (خطوة 9)، معالجة ملف التحقيق (خطوة 11)، إغلاق معاملة إخلاء الطرف نهائيًا (خطوة 14).\n\n3) لائحة شؤون السائقين - البند 20.01 وDTC N-3 Roles & Responsibilities: بيأكدوا إن دور شؤون السائقين محصور في \"end-of-service procedure support\" (دعم إجرائي)، مش تصميم النظام ولا تفعيل الحالة نفسها ولا سياسة الاستثناءات المالية.\n\nخلاصة: دور شؤون السائقين في 3148 محدود بخطوات إخلاء الطرف اللاحقة لتفعيل الحالة (الأدلة 6 و7) - أما تفعيل حالة Terminated نفسها فمسؤولية التشغيل (منفردة أو مشتركة)، ومنطق النظام والإشعارات (أدلة 1-4) مسؤولية Business Application Section، واعتماد الشطب والتسوية النهائية (دليل 8) مسؤولية المالية.",
+    solution: "الأدلة الـ8 اللي طلبها GIA للإغلاق:\n\n[Business Application Section]\n1. السماح بالتسجيل أول 30 يوم، ثم دخول تلقائي لمجموعة الاستثناءات بعد اليوم 31 (بدل الحظر الكامل الحالي).\n2. تغطية كل قنوات الإدخال (يدوي، رفع ملفات، دفعات، وصلات أنظمة) مش بس السيناريو اللي في السكرين شوت.\n3. إشعارات تلقائية لقسمي شؤون السائقين والخزانة والتمويل عند أي تسجيل على موظف منتهي الخدمة.\n4. تقرير مخصص يميز بين أيام 1-30 وما بعد اليوم 31.\n\n[شؤون السائقين]\n5. تنفيذ خطوات إخلاء الطرف اللاحقة لتفعيل حالة Terminated بدقة وفي الوقت المحدد (تحصيل المديونيات، رصيد الإجازات، التأشيرة، المكافأة، ملف التحقيق، إغلاق المعاملة).\n6. مذكرة إجراء توضح دور شؤون السائقين الدقيق (لا المفترَض) - جاهزة ومصححة: ملف مذكرة إجراء - آلية معالجة حالة منتهي الخدمة في JDE (الجزء الخاص بشؤون السائقين) بتاريخ 25/09/2026، توضح تحديدًا إن تفعيل حالة Terminated مسؤولية التشغيل (منفردة أو مشتركة)، وإن دورنا يبدأ بعدها في خطوات إخلاء الطرف.\n7. دورة مراقبة كاملة واحدة بعد التشغيل الفعلي تثبت إن العملية شغالة من الألف للياء، بالتنسيق مع قسم التشغيل تحديدًا لأنه صاحب خطوة تفعيل الحالة.\n\n[المالية]\n8. workflow معتمد لمعالجة أيام 1-30 واستثناءات اليوم 31 فما فوق، مع اعتماد المحاسبة والمدير المختص ومصفوفة DoA لأي شطب.",
+    reference: "ملاحظة 7 - التوصية 1 - خطة العمل 3148 (Traffic Violation Management + تقييم إغلاق GIA + CH-1109) · إجراءات قسم شؤون السائقين (معتمد 24/11/2025) - قسم 8.11 (إنهاء خدمات السائقين - الإقالة، الخطوة 2: تفعيل Terminated في TEAMS/JDE = قسم التشغيل وحده) وقسم 8.12 (إخلاء الطرف، الخطوة 1: تفعيل Terminated = مشترك تشغيل/شؤون سائقين؛ الخطوات 3، 7، 8، 9، 11، 14 = شؤون السائقين منفردة) · لائحة شؤون السائقين البند 20.01 (إجراءات نهاية الخدمة، دور شؤون السائقين محصور في الدعم الإجرائي) · DTC N-3 Roles & Responsibilities (معتمد يوليو 2025): يحصر اختصاص Drivers Affairs Section في \"end-of-service procedure support\" فقط، ولا يشمل تصميم/ضبط منطق النظام (اختصاص Business Application Section) ولا سياسة الشطب والاستثناءات المالية (اختصاص المالية)"
+  },
+  {
+    id: "seed-obs7-rec2-3149",
+    auditNo: "3149",
+    text: "ملاحظة 7 - التوصية 2 (خطة العمل 3149): تطوير برنامج منظم لإدارة مديونيات الموظفين/السائقين بناءً على معايير محددة، تعمير الأرصدة، حدود، KPIs، تنبيهات، تصعيد، معالجة وحل، مكمّل للوحات Tableau الحالية.\n\nالموقف من GIA: \"Partially Addressed / Open\". الـ SOP المقدم (Driver Overpayment Monitoring & Reporting) خطوة جيدة (مراقبة شهرية، فئات تعمير، حد إشعار 2000 درهم، أدوار موزعة) لكنه لسه مجرد إجراء مراقبة وتقرير أرصدة لـ\"سائقين نشطين\" غير معرّفين، ومش برنامج إدارة مديونيات متكامل زي المطلوب. لازم يتوسع الإطار ليغطي دورة حياة المديونية كاملة (التعيين → أثناء الخدمة → بعد انتهاء الخدمة) بكل أنواع المديونيات (تكاليف تعيين/تدريب، تصاريح، تأشيرة، سكن، مخالفات مرور، حوادث، عمولات زايدة، سلف). حد الـ 2000 درهم لازم يفضل \"مشغّل إشعار\" مش حد فصل عام، لأن أرصدة تعيين مشروعة ممكن تتخطاه طبيعيًا.",
+    addedAt: new Date().toLocaleDateString("ar-EG"),
+    status: "قيد المراجعة",
+    department: "شؤون السائقين (تنسيق ودعم فقط، وليست مالكًا حصريًا للبرنامج حسب المراجع المعتمدة) + المالية (مالك بيانات المديونية والخصم التنفيذي) + تطبيقات الأعمال ITD (تشغيل النظام والإشعارات) + العمليات (المراقبة والإحالة للجنة) + لجنة شؤون السائقين (صاحبة قرار التقسيط/الإعفاء)",
+    flagNote: "تقييم GIA وصف شؤون السائقين بأنها \"مالك البرنامج\" (Programme Owner) لكامل برنامج إدارة مديونيات السائقين. هذا غير مسلّم به 100% بالرجوع للمراجع المعتمدة:\n\n1) لائحة شؤون السائقين - البند 23.8 (أحكام عامة): يحدد صراحة أن (إدارة المالية) هي من تغذي النظام الإلكتروني بأرصدة ديون السائقين شهريًا، وأن (إدارة التشغيل) هي من تُحوّل كشوفات السائقين المديونين إلى لجنة شؤون السائقين وتراقب أداءهم 3 أشهر بعد موافقة اللجنة. لا يوجد أي ذكر لشؤون السائقين كطرف منفّذ في دورة رصد/متابعة الديون نفسها.\n\n2) لائحة مخالفات السائقين - البند 7 (الجهات المختصة بالتنفيذ): ينص صراحة أن (قطاع المالية / إدارة المالية) هي جهة التنفيذ المختصة بـ\"خصم المبالغ المالية من السائقين/المشرفات\" — أي أن التنفيذ الفعلي للخصم ليس من اختصاص شؤون السائقين أصلاً.\n\n3) تعميم لجنة شؤون السائقين (28/2025) - اختصاص رقم 8: القرار في تقسيط المبالغ المتراكمة بسبب الغرامات أو الحوادث هو اختصاص (اللجنة) بقرار جماعي، وليس قرارًا تنفيذيًا منفردًا لقسم شؤون السائقين.\n\n4) DTC N-3 Roles & Responsibilities (مستند الهيكل التنظيمي المعتمد من الرئيس التنفيذي، يوليو 2025 - مستند شامل للشركة كلها، مش خاص بالسائقين بس): بيأكد نفس التوزيع من زاوية تانية مستقلة. اختصاصات Drivers Affairs Section المعرّفة رسميًا فيه هي خدمات دعم إداري للسائقين (منها حساب العمولة والحافز كمهمة إدارية، مساعدة الإجازات، إجراءات نهاية الخدمة، التأمين الصحي)، استقبال الشكاوى والتظلمات، التواصل مع السائقين، ومتابعة الامتثال والمخالفات - مفيش فيها أي ذكر لملكية أو تنفيذ برنامج متابعة/تحصيل مديونيات. في المقابل، Treasury & Funding Section (تحت قطاع المالية) مسؤوليتها المعرّفة صراحة هي \"Monitoring and disbursing driver's salaries\"، و Financial Accounting & Controls Section مسؤوليتها إدارة الذمم المدينة (Accounts Receivable) والتحصيل. المستند ده معتمد بتوقيع الرئيس التنفيذي، ومستقل تمامًا عن لائحة شؤون السائقين، وبرضه ما بينسبش برنامج مديونيات السائقين تحديدًا لشؤون السائقين. ملحوظة أمانة: نفس المستند بيثبت كمان إن حساب العمولة/الحافز (كحساب إداري روتيني، مش التحصيل التنفيذي) هو فعلاً من مهام شؤون السائقين الرسمية - يعني الدور مش صفر في الجانب المالي، بس محصور في الحساب/الدعم الإداري، مش في الملكية أو التنفيذ.\n\nخلاصة: الدور المؤكد لشؤون السائقين حسب المراجع هو استقبال الطلبات وتوجيهها (عبر مركز إسعاد السائقين) والمشاركة كعضو/مقرر في اللجان فقط — أما تصميم برنامج إدارة المديونيات وتنفيذ الخصم فمسؤولية مشتركة أساسها المالية والتشغيل ونظام ITD، مع القرار النهائي للجنة. يُنصح بعرض هذا التوزيع على فريق التدقيق لتصحيح افتراض \"الملكية الكاملة\" قبل قفل الملاحظة.",
+    solution: "[ضمن نطاق شؤون السائقين - تقدروا تعملوه مباشرة]\n1. اعتماد رسمي للائحة + SOP جديد بمسمى أدق (Driver Receivables Monitoring & Management بدل Overpayment) مع مرجعية متبادلة وتحكم إصدارات.\n2. تعريف حالات السائق (إجازة، تدريب، إيقاف، تحقيق، إشعار، تصفية، إنهاء خدمة، هروب) والتأكد إن الأرصدة مش بتختفي من المراقبة عند تغيّر الحالة.\n3. توثيق مراحل المديونية اللي بتتعاملوا معاها فعليًا (استرداد تكاليف تعيين لمن يترك قبل سنة، خصومات أثناء الخدمة، تصفية نهاية خدمة خلال 37 يوم).\n4. ضبط آلية إحالة لجنة شؤون السائقين والمشرفين (معايير الإحالة، ملف الحالة، محاضر عينة).\n5. تقارير الـ KPIs الحالية بتاعتكم (استجابة اللجنة 100%، تظلمات SLA 100%، شكاوى SLA 95%، تصفية خلال 37 يوم).\n6. الاحتفاظ بالسجلات (ملفات السائقين سنتين بعد الخدمة، محاضر اللجنة).\n7. دورة مراقبة كاملة واحدة على الأجزاء بتاعتكم بعد الاعتماد.\n8. ربط 3149 بخطة 3151 (الإطار التحفيزي) بدون تكرار SOP.\n\n[من المالية]\n- تعريف رسمي لمسؤوليات اكتمال البيانات، سلامة الأرصدة، الخصومات، التسويات، المعالجة المحاسبية والشطب.\n- تفاصيل كل مديونية على مستوى المصدر (نوع، مرجع، مبلغ أصلي ومتبقي، تاريخ) - هما مالك البيانات.\n- قواعد بداية تعمير الرصيد (تاريخ الاستحقاق، الدفعة الفائتة، التصفية النهائية).\n- إطار تحصيل كامل (خصم راتب، تقسيط، مقاصة نهاية خدمة، تحصيل تأميني/قانوني).\n\n[من تطبيقات الأعمال ITD]\n- ربط حالات السائقين بحقول النظام والتقارير.\n- أدلة إعداد وتفعيل حد الإشعار 2000 درهم والحد الأعلى للإيقاف التلقائي (UAT/تكوين).\n- تكامل JDE-Tableau وتطوير لوحة المعلومات المحسّنة.\n\n[من العمليات]\n- مصفوفة قرارات واضحة لمتابعة السائقين المدينين (مراقبة 3 شهور، معايير التوصية بالإنهاء) مع حالات فعلية موثقة.\n\n[من OCC / Taxi Operations & Controls]\n- إدماج رسمي في آلية التواصل مع السائقين ضمن الـ SOP مع أدلة تواصل فعلية من دورة مكتملة.\n\n[تنسيق بدون تكرار مع خطط أخرى]\n3148 (انتهاء الخدمة) - نقطة تسليم الحالة للمراقبة. 3136/3137/3144 (مخالفات المرور) - نقطة تحول المخالفة لمديونية. 3150 (شطب الديون القديمة - منفذ بالفعل) - فقط الإحالة والمرجع. 3151 (الإطار التحفيزي) - SOP واحد مشترك ممكن. 3152/3153 - نقاط تسليم فقط.\n\n[فجوة إضافية] اللائحة الحالية بتستثني سائقي الباصات رسميًا - لازم توضيح الإطار الحاكم ليهم مع قسم عمليات الباصات والموارد البشرية.",
+    reference: "ملاحظة 7 - التوصية 2 - خطة العمل 3149 (تقييم إغلاق GIA النهائي + Driver Overpayment Monitoring & Reporting SOP-03) · لائحة شؤون السائقين البند 23.8 (تغذية بيانات الديون = المالية، الإحالة والمراقبة = التشغيل) · لائحة المخالفات البند 7 (خصم المبالغ المالية = قطاع المالية) · تعميم لجنة شؤون السائقين 28/2025 اختصاص رقم 8 (تقسيط المديونيات = قرار اللجنة) · DTC N-3 Roles & Responsibilities (معتمد يوليو 2025): يحدد اختصاصات Drivers Affairs Section بأنها خدمات دعم إداري للسائقين (منها حساب العمولة/الحافز كمهمة إدارية) وليس ملكية برنامج متابعة/تحصيل المديونيات، بينما يحدد اختصاصات Treasury & Funding Section بأنها 'صرف رواتب السائقين' واختصاصات Financial Accounting & Controls Section بأنها إدارة الذمم المدينة (Accounts Receivable) والتحصيل - المستند لا ينسب برنامج مراقبة مديونيات السائقين تحديدًا لأي قطاع بالاسم، لكنه يؤكد أن الجانب المالي/التحصيلي ضمن اختصاص المالية وليس شؤون السائقين"
+  },
+  {
+    id: "seed-obs7-rec4-3151",
+    auditNo: "3151",
+    text: "ملاحظة 7 - التوصية 4 (خطة العمل 3151): مراجعة استقطاعات وتسويات وذمم موظفي DTC لضمان توافقها مع الواقع التشغيلي وقانون العمل الإماراتي، وتقييم جدوى إطار تحفيزي سلوكي (إجراءات إيجابية ووقائية وتصحيحية وعقابية) لتعزيز انضباط السداد والشفافية والاحتفاظ بالموظفين، وتنفيذ البرنامج المطوّر بحوكمة واضحة ومؤشرات أداء قابلة للقياس.\n\nالموقف من GIA (تقييم إغلاق متابعة التدقيق): \"Open\" - تقدم جزئي فقط. المستندات المقدمة (قرار إداري 66/2025 بتشكيل لجنة مؤقتة لإدارة مخالفات المرور، لائحة المخالفات v1.0، إجراء تدريب ورعاية السائقين، خطة تدريب 2026) بتغطي حوكمة المخالفات المرورية والتدريب والتأهيل والتصعيد التأديبي والتظلمات بس - ومفيهاش دراسة الواقع الحالي القائمة على البيانات للاستقطاعات/التسويات/الذمم، ولا إعادة الهيكلة لنهج إدارة الذمم القائم على التحفيز المتوافق مع الواقع التشغيلي وقانون العمل. من أصل 15 بند أدلة مطلوبة للإغلاق: 4 بنود \"Not addressed\" تمامًا (دراسة الواقع الحالي، التقييم القانوني لقانون العمل، ملفات الحالات بعد التنفيذ، مذكرة التقييم الذاتي للإغلاق) والباقي \"Partially addressed\".",
+    addedAt: new Date().toLocaleDateString("ar-EG"),
+    status: "قيد المراجعة",
+    department: "شؤون السائقين (تصميم الإطار السلوكي/التحفيزي وتنسيق التنفيذ فقط - ليست مالكًا حصريًا للمراجعة الشاملة حسب مصفوفة الأدلة المطلوبة في تقييم GIA نفسه) + الموارد البشرية/الشؤون القانونية P&C-Legal (التحقق من التوافق مع قانون العمل الإماراتي وحقوق التظلم/الإخطار) + المالية والرواتب والخزانة Finance/Payroll/Treasury (مصفوفة أنواع الاستقطاعات/التسويات/الذمم، حدود الخصم، المعالجة المحاسبية) + تطبيقات الأعمال Business Applications (ربط الأنظمة المصدر) + العمليات (المدخلات التشغيلية)",
+    flagNote: "توصية GIA نفسها مكتوبة بصيغة \"Driver Affairs Section to review DTC's employee deductions, adjustments, and receivables\" - يعني موجّهة اسميًا لشؤون السائقين كمالك. لكن تقييم إغلاق GIA نفسه (نفس المستند) بيكشف إن ده غير دقيق عمليًا لسببين:\n\n1) مصفوفة الحوكمة والمسؤوليات المطلوبة في بند \"Governance and responsibility matrix\" ذاتها بتنص حرفيًا على إن الـ RACI المطلوب للإغلاق لازم يغطي: Driver Affairs + Finance + Payroll + Treasury + P&C + Legal + Business Applications + Operations - يعني حتى تقييم التدقيق نفسه معترف إنها مسؤولية موزعة مش مركزية في شؤون السائقين.\n\n2) بند \"UAE Labour Law and internal policy alignment assessment\" (Not addressed) بيطلب تحديدًا \"Legal / P&C validation\" - أي التحقق من التوافق القانوني هو اختصاص الشؤون القانونية والموارد البشرية أصلًا، مش شؤون السائقين، وده سبب رئيسي في عدم إمكانية إغلاق النقطة.\n\n3) لائحة المخالفات - البند 7 (الجهات المختصة بالتنفيذ): الخصم المالي الفعلي من رصيد السائق/المشرف اختصاص قطاع/إدارة المالية، مش شؤون السائقين.\n\n4) لائحة شؤون السائقين - البند 23.8: تغذية بيانات الديون شهريًا مسؤولية المالية، والإحالة والمراقبة (3 أشهر) مسؤولية التشغيل.\n\n5) تعميم لجنة شؤون السائقين 28/2025 - اختصاص رقم 8: قرار تقسيط المبالغ المتراكمة قرار جماعي للجنة، مش قرار منفرد لشؤون السائقين.\n\n6) DTC N-3 Roles & Responsibilities (معتمد يوليو 2025): يضع driver compliance and accountability والتواصل/المشاركة مع السائقين ضمن اختصاص شؤون السائقين الرسمي. أما مصفوفة أنواع الاستقطاعات ومعالجتها المحاسبية فهي ضمن اختصاص Treasury and Funding Section و Financial Accounting and Controls Section.\n\n7) تصحيح مهم بعد تدقيق مباشر لجدول المخالفات نفسه (مش وصفه فقط): كان في افتراض سابق إن مكتب التحقيق التابع لشؤون السائقين هو جهة التطبيق (صاحبة قرار العقوبة) لمعظم بنود لائحة المخالفات - وده غير دقيق. بالرجوع لعمود جهة التطبيق الفعلي في جدول المخالفات (قسم 5، حوالي 150 بند): الأغلبية الساحقة من المخالفات التشغيلية اليومية (غياب، تأخير، تجاوز سرعة، دخول من خارج الإمارة، عدم تمرير بطاقة العمل، إلخ) بيتحدد فيها وتُطبَّق العقوبة مباشرة من نفس القسم التشغيلي اللي رصدها (قسم تشغيل مركبات الأجرة ومركز التحكم، قسم تشغيل الحافلات، قسم الأنشطة التجارية) - من غير أي رجوع لمكتب التحقيق. دور مكتب التحقيق (شؤون السائقين) كجهة تطبيق محصور فعليًا في: (أ) مخالفات عدم الالتزام بالتعليمات العامة المُحالة من جميع الوحدات التنظيمية (البند 6 من الجدول)، و(ب) الحالات اللي فيها توصية بإنهاء الخدمة أو إيقاف احترازي - وهنا بالتحديد بيُستدعى السائق للمثول أمام شؤون السائقين للتحقيق والدفاع خلال 7 أيام عمل (لائحة المخالفات - البند 8 اتفاقية مستوى الخدمة)، إلا في حالات تحتاج بحث دقيق أو غياب شهود. يعني دور التحقيق محدود بالطلب أو التعقيد زي ما هو معمول به فعليًا، مش المسار الافتراضي لكل مخالفة.\n\n8) إجراءات التدريب ورعاية السائقين (معتمد 15/12/2025): بيوثق فعليًا جانب وقائي وتصحيحي وتأهيلي قائم (إعادة تدريب بعد الحوادث، برنامج إعادة تأهيل، تقييم نفسي) لكنه مركّز على السلامة المرورية والسلوك القيادي، مش على الالتزام المالي أو السداد تحديدًا - يصلح كسند منهجي على وجود نهج وقائي معتمد فعلاً، مش كإغلاق مباشر لفجوة الإطار التحفيزي المالي المطلوبة في التوصية 4.\n\n9) الشق الإيجابي/التحفيزي فعليًا موجود ومعتمد، مش فجوة: إجراء صرف الجوائز لسائقي مركبات الأجرة (معتمد نوفمبر 2024 بتوقيع الرئيس التنفيذي، مالك الإجراء قسم شؤون السائقين) بيحدد خطة جوائز سنوية معتمدة الموازنة، تُستخرج قوائم السائقين المستحقين وفق معايير معتمدة في لائحة المكافآت والجوائز (الخطوة 3 من الإجراء)، وتُصرف عبر Payroll، مع مؤشر أداء معتمد (100% التزام بالخطة). حسب قسم شؤون السائقين: معايير الاستحقاق مبنية على السجل الأقل مخالفات، وبالتبعية العملية يستبعد ذلك غالبًا السائقين أصحاب المديونيات الناتجة عن مخالفات متكررة. ملاحظة أمانة: نص لائحة المكافآت والجوائز نفسها (اللي فيها تفاصيل المعايير) لسه مش متاح كملف مستقل في المرجع المعتمد - بس الإجراء التنفيذي المعتمد اللي يشير إليها، فلو اتوفر نص اللائحة نفسها هيبقى دليل إغلاق أقوى ومباشر.\n\nخلاصة معدَّلة: شؤون السائقين تملك وتقود فعلاً تصميم الإطار التحفيزي والسلوكي من ناحية التواصل والتنسيق والتذكير والإحالة للجان (بحكم دورها المعتمد وقيادتها للجنة شؤون السائقين)، لكن التنفيذ الفعلي للعقوبات التشغيلية اليومية ليس من اختصاصها أصلاً (نقطة 7 أعلاه)، ودراسة الواقع الحالي للاستقطاعات والذمم والتحقق القانوني من قانون العمل ومصفوفة أنواع الاستقطاعات المحاسبية مسؤولية مشتركة أساسها P&C/Legal والمالية والرواتب - ولازم توضيح ده لفريق التدقيق قبل قبول ملكية شؤون السائقين الكاملة للتوصية 4.",
+    solution: "[من مصفوفة الأدلة الـ15 في تقييم إغلاق GIA - موزعة حسب الجهة]\n\n[شؤون السائقين - تم إنجازها فعليًا وأصبحت مرفقة كمستندات جاهزة للعرض]\n1. الإطار التحفيزي/السلوكي (إجراءات إيجابية ووقائية وتصحيحية، وتنسيق الشق التأديبي) - مسودة أولى كاملة جاهزة: ملف مسودة الإطار التحفيزي والسلوكي لتعزيز انضباط السداد (محدَّثة 25/09/2026) - الشق الإيجابي فيها أصبح مستنداً لإجراء صرف الجوائز لسائقي مركبات الأجرة المعتمد فعلاً (مش مقترح جديد)، وبانتظار مراجعة المالية وP&C على باقي الأقسام قبل الاعتماد النهائي.\n2. مذكرة التقييم الذاتي للإغلاق (Closure self-assessment) تربط كل بند من الـ15 بالدليل المقدم وموقف القسم منه، ومرفق بها مقترح مصفوفة RACI أولية - ملف مذكرة التقييم الذاتي لإغلاق نقطة 3151 (25/09/2026).\n3. حزمة التواصل مع الموظفين: نموذج تعهد الأداء المالي ورسائل SMS (قائمة فعلاً ضمن إجراءات قسم شؤون السائقين)، مع إضافة قوالب FAQ وإشعار السداد المبكر ضمن المسودة الجديدة أعلاه.\n4. آلية التظلم والاستئناف موجودة فعلاً (دليل التظلمات والشكاوى)، وأُضيف مسار جديد لحالات الصعوبة المالية (Hardship Review) ضمن مسودة الإطار التحفيزي.\n5. مقترح مصفوفة RACI أولية معروض على باقي الجهات للتعليق، بدل المشاركة كعضو غير محدد الدور.\n\n[P&C / الشؤون القانونية - لازم تتطلب منهم]\n6. التقييم القانوني الكامل لتوافق أنواع الاستقطاعات مع قانون العمل الإماراتي (حدود الخصم، الموافقة، حقوق الإخطار والتظلم، معالجة نهاية الخدمة).\n\n[المالية/الرواتب/الخزانة - لازم تتطلب منهم]\n7. مصفوفة كاملة لأنواع الاستقطاعات/التسويات/الذمم (مخالفات، مدفوعات زايدة، سلف، تسويات، إعفاءات، عكس قيود) مربوطة بالنظام المصدر والمالك والأساس القانوني.\n8. دراسة الواقع الحالي القائمة على البيانات (تأثير الراتب، القدرة على تحمل الأقساط، فترة السداد، أنماط النزاعات).\n9. مؤشرات KPI/KRI للتحصيل (انضباط السداد، معدل النزاعات، دورة التسوية، مخاطر الاستقالة/الإنهاء).\n\n[لجنة المرور المؤقتة (قرار 66/2025) / الحوكمة المشتركة]\n10. توسيع نطاق مراجعة اللجنة الحالية (مخالفات المرور فقط) لتشمل الاستقطاعات/التسويات/الذمم كاملة، أو تشكيل مسار حوكمة موازٍ.\n11. محاضر اجتماعات دورية وتقارير ربع سنوية موثقة (مطلوبة بالفعل من قرار 66/2025 لكن لم تُقدَّم).\n\n[مشترك - بعد اعتماد كل ما سبق]\n12. SOP معاد صياغته يغطي الاستقطاع/التسوية/الذمم بالكامل (مسؤوليات، اعتمادات، خطط سداد، استثناءات، نزاعات، تصعيد).\n13. أدلة تنفيذ فعلي (تتبع الطرح، تدريب، إطلاق فعلي، نتائج تجريبية).\n14. ملفات حالات نموذجية بعد التنفيذ.\n15. تقارير رقابة إدارية دورية (استثناءات، قرارات، متابعة).",
+    reference: "ملاحظة 7 - التوصية 4 - خطة العمل 3151 (Traffic Fines Management - Observation 7 / Recommendation 4 / Action Plan Audit Follow-up Closure Assessment، مصفوفة الأدلة الـ15 بند) · قرار إداري 66/2025 (تشكيل لجنة مؤقتة لإدارة مخالفات المرور) · لائحة المخالفات لسائقي ومشرفي DTC v1.0 مايو 2024 (البند 5 - جدول المخالفات: جهة التطبيق للمخالفات التشغيلية اليومية = الأقسام التشغيلية نفسها، ودور مكتب التحقيق محصور بمخالفات السياسات العامة وحالات التوصية بإنهاء الخدمة · البند 7 - الجهات المختصة بالتنفيذ: الخصم المالي = المالية · البند 8 - اتفاقية مستوى الخدمة مع التحقيق) · إجراءات التدريب ورعاية السائقين معتمد 15/12/2025 (سند وقائي/تأهيلي جزئي، غير مالي) · لائحة شؤون السائقين البند 23.8 (تغذية بيانات الديون = المالية، المراقبة = التشغيل) · تعميم داخلي 28/2025 - لجنة شؤون السائقين (نص الاختصاص رقم 8 مؤكد من التعميم الأصلي مباشرة: تقسيط المبالغ المتراكمة بسبب الغرامات أو الحوادث = قرار جماعي للجنة برئاسة شؤون السائقين) · تعميم داخلي 32/2025 - لجنة تظلمات السائقين (تعتبر استئناف على قرارات لجنة شؤون السائقين وعلى كل الجزاءات الداخلية من التحقيق والأقسام) · دليل التظلمات والشكاوى المعتمد بقرار إداري 19/2024 · DTC N-3 Roles & Responsibilities معتمد يوليو 2025 · مصفوفة الحوكمة المطلوبة في تقييم إغلاق GIA نفسه (RACI موزع بين Driver Affairs/Finance/Payroll/Treasury/P&C/Legal/Business Applications/Operations) · مستندات معدة الآن: مسودة الإطار التحفيزي والسلوكي لتعزيز انضباط السداد، ومذكرة التقييم الذاتي لإغلاق نقطة 3151 (كلاهما 25/09/2026)"
+  }
+];
+
+let points = loadPoints();
+{
+  let seeded = false;
+  SEED_POINTS.forEach(sp => {
+    const existing = points.find(p => p.id === sp.id);
+    if(!existing){
+      points.push(sp);
+      seeded = true;
+    } else {
+      // refresh the grounded analysis fields (department/solution/reference/flagNote)
+      // to the latest reference-backed version, without touching status or any manual edits to the point text.
+      if(existing.department !== sp.department || existing.solution !== sp.solution || existing.reference !== sp.reference || existing.flagNote !== sp.flagNote){
+        existing.department = sp.department;
+        existing.solution = sp.solution;
+        existing.reference = sp.reference;
+        existing.flagNote = sp.flagNote || "";
+        seeded = true;
+      }
+    }
+  });
+  if(seeded) savePoints(points);
+}
+
+function addPoints(newTexts){
+  const now = new Date().toLocaleDateString("ar-EG");
+  newTexts.forEach(t => {
+    t = t.trim();
+    if(!t) return;
+    points.push({
+      id: Date.now() + Math.random().toString(36).slice(2,7),
+      auditNo: "",
+      text: t,
+      addedAt: now,
+      status: "قيد المراجعة",
+      department: "",
+      solution: "",
+      reference: "",
+      flagNote: ""
+    });
+  });
+  savePoints(points);
+  renderTable();
+}
+
+function addFromTextarea(){
+  const box = document.getElementById("pasteBox");
+  const lines = box.value.split("\n").map(l => l.trim()).filter(Boolean);
+  if(lines.length === 0) return;
+  addPoints(lines);
+  box.value = "";
+}
+
+function handleFile(){
+  const input = document.getElementById("fileInput");
+  const file = input.files[0];
+  if(!file){ alert("اختر ملف الأول"); return; }
+  const ext = file.name.split(".").pop().toLowerCase();
+
+  if(ext === "xlsx" || ext === "xls" || ext === "csv"){
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const wb = XLSX.read(e.target.result, {type:"array"});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+      const texts = rows.map(r => (r && r[0] != null) ? String(r[0]).trim() : "").filter(Boolean);
+      addPoints(texts);
+      input.value = "";
+    };
+    reader.readAsArrayBuffer(file);
+  } else if(ext === "txt"){
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const lines = e.target.result.split("\n").map(l=>l.trim()).filter(Boolean);
+      addPoints(lines);
+      input.value = "";
+    };
+    reader.readAsText(file);
+  } else if(ext === "docx"){
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      mammoth.extractRawText({arrayBuffer: e.target.result}).then(result => {
+        const lines = result.value.split("\n").map(l=>l.trim()).filter(Boolean);
+        addPoints(lines);
+        input.value = "";
+      }).catch(err => alert("تعذر قراءة ملف الوورد: " + err.message));
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    alert("صيغة غير مدعومة. استخدم xlsx أو csv أو txt أو docx.");
+  }
+}
+
+function updateField(id, field, value){
+  const p = points.find(p => p.id === id);
+  if(!p) return;
+  p[field] = value;
+  savePoints(points);
+  if(field === "status") renderTable();
+}
+
+function deletePoint(id){
+  if(!confirm("حذف هذه النقطة من السجل؟")) return;
+  points = points.filter(p => p.id !== id);
+  savePoints(points);
+  renderTable();
+}
+
+function handleAttachUpload(id, input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  if(file.size > 8*1024*1024){
+    alert("الملف أكبر من 8 ميجا. يُفضّل رفع ملفات أصغر لأنها تُخزّن محليًا في المتصفح.");
+    input.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const p = points.find(p => p.id === id);
+    if(!p) return;
+    if(!p.attachments) p.attachments = [];
+    p.attachments.push({
+      name: file.name,
+      dataUrl: e.target.result,
+      addedAt: new Date().toLocaleString('ar-EG')
+    });
+    try{
+      savePoints(points);
+    }catch(err){
+      alert("تعذّر حفظ الملف محليًا (مساحة التخزين ممتلئة). جرّب ملفًا أصغر أو احذف مرفقات قديمة.");
+      p.attachments.pop();
+      return;
+    }
+    renderTable();
+  };
+  reader.readAsDataURL(file);
+  input.value = "";
+}
+
+function removeAttachment(id, idx){
+  if(!confirm("حذف هذا المرفق؟")) return;
+  const p = points.find(p => p.id === id);
+  if(!p || !p.attachments) return;
+  p.attachments.splice(idx, 1);
+  savePoints(points);
+  renderTable();
+}
+
+function statusClass(s){
+  if(s === "مقبول") return "status-accepted";
+  if(s === "معترض عليه") return "status-objected";
+  return "status-pending";
+}
+
+function renderTable(){
+  const wrap = document.getElementById("tableWrap");
+  const statsEl = document.getElementById("stats");
+
+  const pending = points.filter(p=>p.status==="قيد المراجعة").length;
+  const accepted = points.filter(p=>p.status==="مقبول").length;
+  const objected = points.filter(p=>p.status==="معترض عليه").length;
+  const flagged = points.filter(p => (p.flagNote || "").trim() !== "");
+  statsEl.innerHTML = `<span>الإجمالي: <b>${points.length}</b></span><span>قيد المراجعة: <b>${pending}</b></span><span>مقبول: <b>${accepted}</b></span><span>معترض عليه: <b>${objected}</b></span><span>⚠️ تحتاج مراجعة (خارج نطاق شؤون السائقين وحدها): <b>${flagged.length}</b></span>`;
+
+  const flagBox = document.getElementById("flagBox");
+  if(flagged.length === 0){
+    flagBox.innerHTML = "";
+  } else {
+    flagBox.innerHTML = `
+      <div class="flag-box">
+        <h3>⚠️ نقاط مستندة إلى الأدلة — مش مسلّم بيها 100% إنها من اختصاص شؤون السائقين وحدها</h3>
+        ${flagged.map(p => `<div class="flag-item"><b>${escapeHtml(p.auditNo || "بدون رقم")}</b> — ${escapeHtml((p.flagNote||"").slice(0,300))}${(p.flagNote||"").length>300?"…":""}</div>`).join("")}
+      </div>
+    `;
+  }
+
+  if(points.length === 0){
+    wrap.innerHTML = `<div class="empty">لا توجد نقاط تدقيق مضافة بعد. الصق النقاط أو ارفع ملف من فوق.</div>`;
+    return;
+  }
+
+  const rows = points.map((p, idx) => `
+    <tr>
+      <td>${idx+1}</td>
+      <td style="min-width:220px;">
+        <input placeholder="الرقم المرجعي (مثال: 3148)" value="${escapeHtml(p.auditNo || '')}" onchange="updateField('${p.id}','auditNo',this.value)" style="margin-bottom:6px; font-weight:700; color:var(--accent2);">
+        <textarea onchange="updateField('${p.id}','text',this.value)">${escapeHtml(p.text)}</textarea>
+        <div class="hint">${p.addedAt}</div>
+      </td>
+      <td>
+        <select onchange="updateField('${p.id}','status',this.value)">
+          <option ${p.status==="قيد المراجعة"?"selected":""}>قيد المراجعة</option>
+          <option ${p.status==="مقبول"?"selected":""}>مقبول</option>
+          <option ${p.status==="معترض عليه"?"selected":""}>معترض عليه</option>
+        </select>
+        <div style="margin-top:6px;"><span class="status-badge ${statusClass(p.status)}">${p.status}</span></div>
+      </td>
+      <td style="min-width:150px;"><input placeholder="مثال: قسم الموارد البشرية" value="${escapeHtml(p.department)}" onchange="updateField('${p.id}','department',this.value)"></td>
+      <td style="min-width:220px;"><textarea placeholder="الحل المقترح أو الإجراء الجديد" onchange="updateField('${p.id}','solution',this.value)">${escapeHtml(p.solution)}</textarea></td>
+      <td style="min-width:150px;"><input placeholder="بند اللائحة / اللجنة" value="${escapeHtml(p.reference)}" onchange="updateField('${p.id}','reference',this.value)"></td>
+      <td style="min-width:200px;"><textarea class="${(p.flagNote||'').trim()?'flag-input':''}" placeholder="اتركها فاضية لو النقطة فعلاً من اختصاص شؤون السائقين. لو المراجع بتقول إنها كلها أو جزء منها مش اختصاصنا، اكتب هنا السبب والدليل." onchange="updateField('${p.id}','flagNote',this.value)">${escapeHtml(p.flagNote||"")}</textarea></td>
+      <td>
+        <button class="del-btn" onclick="deletePoint('${p.id}')">حذف</button>
+        <div class="attach-wrap">
+          <input type="file" id="file-${p.id}" style="display:none" accept=".doc,.docx,.pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg" onchange="handleAttachUpload('${p.id}', this)">
+          <button class="attach-btn" title="رفع ملف (درافت/مرفق) لهذه النقطة" onclick="document.getElementById('file-${p.id}').click()">📎 رفع ملف</button>
+          ${(p.attachments||[]).map((a,i) => `
+            <div class="attach-chip">
+              <a href="${a.dataUrl}" download="${escapeHtml(a.name)}" title="${escapeHtml(a.name)} — ${escapeHtml(a.addedAt||'')}">${escapeHtml(a.name.length>18? a.name.slice(0,16)+'…' : a.name)}</a>
+              <span class="attach-del" title="حذف المرفق" onclick="removeAttachment('${p.id}',${i})">×</span>
+            </div>
+          `).join("")}
+        </div>
+      </td>
+    </tr>
+  `).join("");
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>نص النقطة</th><th>الحالة</th><th>القسم المحوّل له</th><th>الحل / الإجراء المقترح</th><th>المرجع</th><th>⚠️ تحتاج مراجعة (ليست 100% ضمن اختصاصنا)</th><th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function escapeHtml(s){
+  if(!s) return "";
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function copyPending(){
+  const pending = points.filter(p => p.status === "قيد المراجعة");
+  if(pending.length === 0){ alert("لا توجد نقاط قيد المراجعة حاليًا."); return; }
+  const text = "نقاط تدقيق للتحليل مقابل اللوائح المعتمدة واللجان:\n\n" +
+    pending.map((p,i) => `${i+1}. ${p.auditNo ? "[" + p.auditNo + "] " : ""}${p.text}`).join("\n");
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try{
+    document.execCommand("copy");
+    alert("تم نسخ " + pending.length + " نقطة. الصقها الآن في الشات مع Claude.");
+  }catch(e){
+    alert("تعذر النسخ التلقائي. حدد النص التالي وانسخه يدويًا:\n\n" + text);
+  }
+  document.body.removeChild(ta);
+}
+
+/* ---------- Export as Excel: one workbook per point, and one combined workbook ---------- */
+const XLSX_LABELS = ["الحقل","القيمة"];
+function pointToWorkbook(p, idx){
+  const rows = [
+    XLSX_LABELS,
+    ["الرقم المرجعي", p.auditNo || ""],
+    ["نص النقطة", p.text || ""],
+    ["الحالة", p.status || ""],
+    ["القسم المحوّل له", p.department || ""],
+    ["الحل / الإجراء المقترح", p.solution || ""],
+    ["المرجع", p.reference || ""],
+    ["⚠️ يحتاج مراجعة (ليس بالضرورة من اختصاصنا وحدنا)", p.flagNote || ""],
+    ["تاريخ الإضافة", p.addedAt || ""]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 22 }, { wch: 100 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "نقطة تدقيق");
+  return wb;
+}
+function exportEachAsFile(){
+  if(points.length === 0){ alert("لا توجد نقاط للتصدير."); return; }
+  points.forEach((p, i) => {
+    setTimeout(() => {
+      const wb = pointToWorkbook(p, i);
+      const safeName = String(p.auditNo || ("نقطة-" + (i + 1))).replace(/[\\/:*?"<>|]/g, "_");
+      XLSX.writeFile(wb, `نقطة_${safeName}.xlsx`);
+    }, i * 400);
+  });
+}
+function exportAllXLSX(){
+  if(points.length === 0){ alert("لا توجد بيانات للتصدير."); return; }
+  const header = ["#","الرقم المرجعي","نص النقطة","الحالة","القسم المحول له","الحل المقترح","المرجع","يحتاج مراجعة","تاريخ الإضافة"];
+  const rows = points.map((p,i) => [i+1, p.auditNo, p.text, p.status, p.department, p.solution, p.reference, p.flagNote||"", p.addedAt]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws["!cols"] = [{wch:5},{wch:14},{wch:60},{wch:14},{wch:30},{wch:60},{wch:30},{wch:60},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "سجل نقاط التدقيق");
+  XLSX.writeFile(wb, "سجل_نقاط_التدقيق.xlsx");
+}
+function exportFlaggedXLSX(){
+  const flagged = points.filter(p => (p.flagNote||"").trim() !== "");
+  if(flagged.length === 0){ alert("لا توجد نقاط محددة كـ\"تحتاج مراجعة\" حاليًا."); return; }
+  const header = ["#","الرقم المرجعي","نص النقطة","السبب / الدليل المرجعي إنها ليست من اختصاصنا وحدنا بالكامل","المرجع المعتمد المستند إليه"];
+  const rows = flagged.map((p,i) => [i+1, p.auditNo, p.text, p.flagNote, p.reference]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws["!cols"] = [{wch:5},{wch:14},{wch:60},{wch:70},{wch:40}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "نقاط تحتاج مراجعة");
+  XLSX.writeFile(wb, "نقاط_تحتاج_مراجعة_فريق_التدقيق.xlsx");
+}
+
+renderRef();
+renderTable();
+</script>
+</div>
+</body>
+</html>
